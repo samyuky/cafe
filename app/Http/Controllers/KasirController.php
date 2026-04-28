@@ -123,6 +123,7 @@ class KasirController extends Controller
         $transactions = Transaction::where('user_id', auth()->id())
             ->orderBy('created_at', 'desc')
             ->get();
+            
         return view('kasir.transactions', compact('transactions'));
     }
     

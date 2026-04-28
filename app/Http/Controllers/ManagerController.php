@@ -134,17 +134,34 @@ class ManagerController extends Controller
     
     public function storeMenu(Request $request)
     {
-        $request->validate([
-            'name' => 'required|string|max:255',
+        $validator = \Validator::make($request->all(), [
+            'name' => 'required|string|min:3|max:255',
             'category' => 'required|in:makanan,minuman',
-            'price' => 'required|numeric|min:0',
-            'description' => 'nullable|string',
+            'price' => 'required|numeric|min:500|max:999999',
+            'description' => 'nullable|string|max:500',
             'image' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
         ], [
-            'image.image' => 'File harus berupa gambar',
-            'image.mimes' => 'Format gambar harus JPG, PNG, atau WebP',
-            'image.max' => 'Ukuran gambar maksimal 2MB',
+            'name.required' => 'Nama menu wajib diisi!',
+            'name.min' => 'Nama menu minimal 3 karakter!',
+            'name.max' => 'Nama menu maksimal 255 karakter!',
+            'category.required' => 'Kategori wajib dipilih!',
+            'category.in' => 'Kategori tidak valid!',
+            'price.required' => 'Harga menu wajib diisi!',
+            'price.numeric' => 'Harga harus berupa angka!',
+            'price.min' => 'Harga minimal Rp 500!',
+            'price.max' => 'Harga maksimal Rp 999.999!',
+            'description.max' => 'Deskripsi maksimal 500 karakter!',
+            'image.image' => 'File harus berupa gambar!',
+            'image.mimes' => 'Format gambar harus JPG, PNG, atau WebP!',
+            'image.max' => 'Ukuran gambar maksimal 2MB!',
         ]);
+
+        if ($validator->fails()) {
+            return redirect()->back()
+                ->withErrors($validator)
+                ->withInput()
+                ->with('error', 'Validasi gagal! Periksa kembali input Anda.');
+        }
         
         $imagePath = null;
         if ($request->hasFile('image')) {
@@ -166,18 +183,39 @@ class ManagerController extends Controller
             'description' => 'Menambahkan menu baru: ' . $request->name . ' (Rp ' . number_format($request->price) . ')'
         ]);
         
-        return redirect()->route('manager.menus')->with('success', 'Menu berhasil ditambahkan!');
+        return redirect()->route('manager.menus')->with('success', 'Menu "' . $menu->name . '" berhasil ditambahkan! 🎉');
     }
-    
+
     public function updateMenu(Request $request, $id)
     {
-        $request->validate([
-            'name' => 'required|string|max:255',
+        $validator = \Validator::make($request->all(), [
+            'name' => 'required|string|min:3|max:255',
             'category' => 'required|in:makanan,minuman',
-            'price' => 'required|numeric|min:0',
-            'description' => 'nullable|string',
+            'price' => 'required|numeric|min:500|max:999999',
+            'description' => 'nullable|string|max:500',
             'image' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
+        ], [
+            'name.required' => 'Nama menu wajib diisi!',
+            'name.min' => 'Nama menu minimal 3 karakter!',
+            'name.max' => 'Nama menu maksimal 255 karakter!',
+            'category.required' => 'Kategori wajib dipilih!',
+            'category.in' => 'Kategori tidak valid!',
+            'price.required' => 'Harga menu wajib diisi!',
+            'price.numeric' => 'Harga harus berupa angka!',
+            'price.min' => 'Harga minimal Rp 500!',
+            'price.max' => 'Harga maksimal Rp 999.999!',
+            'description.max' => 'Deskripsi maksimal 500 karakter!',
+            'image.image' => 'File harus berupa gambar!',
+            'image.mimes' => 'Format gambar harus JPG, PNG, atau WebP!',
+            'image.max' => 'Ukuran gambar maksimal 2MB!',
         ]);
+
+        if ($validator->fails()) {
+            return redirect()->back()
+                ->withErrors($validator)
+                ->withInput()
+                ->with('error', 'Validasi gagal! Periksa kembali input Anda.');
+        }
         
         $menu = Menu::findOrFail($id);
         
@@ -201,23 +239,20 @@ class ManagerController extends Controller
         ActivityLog::create([
             'user_id' => auth()->id(),
             'activity' => 'Edit Menu',
-            'description' => 'Mengedit menu: ' . $menu->name
+            'description' => 'Mengedit menu: ' . $menu->name . ' (Rp ' . number_format($request->price) . ')'
         ]);
         
-        return redirect()->route('manager.menus')->with('success', 'Menu berhasil diupdate!');
+        return redirect()->route('manager.menus')->with('success', 'Menu "' . $menu->name . '" berhasil diupdate! ✅');
     }
     
     // LAPORAN
-    public function reports()
+    public function reports(Request $request)
     {
         $users = User::where('role', 'kasir')->get();
-        return view('manager.reports', compact('users'));
-    }
-    
-    public function filterReports(Request $request)
-    {
+        
         $query = Transaction::with(['user', 'transactionDetails.menu']);
         
+        // Filter
         if($request->filled('user_id')) {
             $query->where('user_id', $request->user_id);
         }
@@ -230,10 +265,45 @@ class ManagerController extends Controller
             $query->whereDate('transaction_date', '<=', $request->date_to);
         }
         
+        if($request->filled('payment_method')) {
+            $query->where('payment_method', $request->payment_method);
+        }
+        
         $transactions = $query->orderBy('transaction_date', 'desc')->get();
         $totalIncome = $transactions->sum('total_amount');
+        $totalTransactions = $transactions->count();
         
-        return view('manager.report_result', compact('transactions', 'totalIncome'));
+        // Statistik tambahan
+        $avgTransaction = $totalTransactions > 0 ? $totalIncome / $totalTransactions : 0;
+        
+        // Penjualan per kategori
+        $foodTotal = 0;
+        $drinkTotal = 0;
+        foreach($transactions as $trans) {
+            foreach($trans->transactionDetails as $detail) {
+                if($detail->menu && $detail->menu->category == 'makanan') {
+                    $foodTotal += $detail->subtotal;
+                } elseif($detail->menu) {
+                    $drinkTotal += $detail->subtotal;
+                }
+            }
+        }
+        
+        // Penjualan per metode pembayaran
+        $tunaiTotal = $transactions->where('payment_method', 'tunai')->sum('total_amount');
+        $qrisTotal = $transactions->where('payment_method', 'qris')->sum('total_amount');
+        
+        return view('manager.reports', compact(
+            'users',
+            'transactions',
+            'totalIncome',
+            'totalTransactions',
+            'avgTransaction',
+            'foodTotal',
+            'drinkTotal',
+            'tunaiTotal',
+            'qrisTotal'
+        ));
     }
     
     // LOG AKTIVITAS
