@@ -1,123 +1,177 @@
-@extends('layouts.cafe')
+@extends('layouts.kasir')
 
 @section('title', 'Struk Pembayaran')
 
 @section('content')
-<div class="max-w-2xl mx-auto">
-    <div class="cafe-card p-8">
-        <!-- Header Struk -->
-        <div class="text-center border-b-2 border-dashed border-amber-300 pb-6 mb-6">
-            <div class="text-5xl mb-3">☕</div>
-            <h1 class="text-2xl font-bold text-amber-900">CUMA Cafe</h1>
-            <p class="text-gray-500">Jl. Kopi Nikmat No. 123</p>
-            <p class="text-gray-500">Telp: (021) 1234-5678</p>
-            <div class="mt-3">
-                <span class="bg-green-100 text-green-700 px-4 py-1 rounded-full text-sm font-semibold">
-                    ✅ LUNAS
+<div class="max-w-lg mx-auto">
+    <div class="card p-8" id="printArea">
+        <!-- Header -->
+        <div class="text-center border-b-2 border-dashed border-coffee-200 pb-6 mb-6">
+            <div class="w-16 h-16 bg-gradient-to-br from-coffee-700 to-coffee-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
+                <i class="ph ph-coffee text-white text-2xl"></i>
+            </div>
+            <h2 class="text-2xl font-display font-bold text-coffee-900">CUMA Cafe</h2>
+            <p class="text-coffee-500 text-sm mt-1">Jl. Kopi Nikmat No. 123</p>
+            
+            <!-- Nomor Antrian -->
+            <div class="mt-4 inline-flex flex-col items-center">
+                <span class="text-xs text-coffee-400">Nomor Antrian</span>
+                <span class="text-3xl font-bold text-coffee-900 bg-coffee-50 px-6 py-2 rounded-xl mt-1">
+                    {{ $transaction->queue_number }}
                 </span>
+            </div>
+            
+            <div class="mt-3 inline-flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-700 rounded-full">
+                <i class="ph ph-check-circle text-emerald-600"></i>
+                <span class="text-sm font-semibold">LUNAS</span>
             </div>
         </div>
 
         <!-- Info Transaksi -->
-        <div class="grid grid-cols-2 gap-3 mb-6 text-sm">
-            <div>
-                <span class="text-gray-500">No. Transaksi:</span>
-                <span class="font-semibold">#{{ str_pad($transaction->id, 6, '0', STR_PAD_LEFT) }}</span>
+        <div class="bg-coffee-50 rounded-2xl p-4 mb-6">
+            <div class="grid grid-cols-2 gap-3 text-sm">
+                <div>
+                    <p class="text-coffee-400 text-xs">No. Transaksi</p>
+                    <p class="font-bold text-coffee-900">#{{ str_pad($transaction->id, 6, '0', STR_PAD_LEFT) }}</p>
+                </div>
+                <div class="text-right">
+                    <p class="text-coffee-400 text-xs">Kasir</p>
+                    <p class="font-medium text-coffee-700">{{ $transaction->user->full_name }}</p>
+                </div>
+                <div>
+                    <p class="text-coffee-400 text-xs">Tanggal</p>
+                    <p class="font-medium text-coffee-700">{{ $transaction->created_at->format('d M Y') }}</p>
+                </div>
+                <div class="text-right">
+                    <p class="text-coffee-400 text-xs">Jam</p>
+                    <p class="font-medium text-coffee-700">{{ $transaction->created_at->format('H:i') }}</p>
+                </div>
             </div>
-            <div>
-                <span class="text-gray-500">Tanggal:</span>
-                <span class="font-semibold">{{ $transaction->created_at->format('d/m/Y H:i') }}</span>
-            </div>
-            <div>
-                <span class="text-gray-500">Kasir:</span>
-                <span class="font-semibold">{{ $transaction->user->full_name }}</span>
-            </div>
-            <div>
-                <span class="text-gray-500">No. Meja:</span>
-                <span class="font-semibold text-lg text-amber-700">{{ $transaction->table_number }}</span>
+            
+            <div class="mt-4 pt-4 border-t border-coffee-200 space-y-2">
+                <div class="flex justify-between">
+                    <span class="text-coffee-500 text-sm">Nama Pembeli</span>
+                    <span class="font-semibold text-coffee-900">{{ $transaction->customer_name }}</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-coffee-500 text-sm">Metode Bayar</span>
+                    <span class="font-semibold text-coffee-900 uppercase">
+                        @php
+                            $methods = [
+                                'tunai' => '💵 Tunai',
+                                'qris' => '📱 QRIS',
+                            ];
+                        @endphp
+                        {{ $methods[$transaction->payment_method] ?? $transaction->payment_method }}
+                    </span>
+                </div>
             </div>
         </div>
 
         <!-- Detail Pesanan -->
-        <table class="w-full mb-6">
-            <thead>
-                <tr class="border-b-2 border-amber-200">
-                    <th class="text-left py-2 text-amber-900">Item</th>
-                    <th class="text-center py-2 text-amber-900">Qty</th>
-                    <th class="text-right py-2 text-amber-900">Harga</th>
-                    <th class="text-right py-2 text-amber-900">Subtotal</th>
-                </tr>
-            </thead>
-            <tbody>
+        <div class="mb-6">
+            <h4 class="font-semibold text-coffee-900 mb-3">Detail Pesanan</h4>
+            <div class="space-y-2">
                 @foreach($transaction->transactionDetails as $detail)
-                <tr class="border-b border-gray-100">
-                    <td class="py-3">
-                        <div class="flex items-center space-x-2">
-                            <span class="text-xl">{{ $detail->menu->category == 'makanan' ? '🍽️' : '🥤' }}</span>
-                            <span>{{ $detail->menu->name }}</span>
+                <div class="flex items-center justify-between py-3 border-b border-coffee-100">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-xl flex items-center justify-center
+                            {{ $detail->menu->category == 'makanan' ? 'bg-orange-50' : 'bg-blue-50' }}">
+                            <i class="ph {{ $detail->menu->category == 'makanan' ? 'ph-hamburger' : 'ph-coffee' }} text-lg
+                                {{ $detail->menu->category == 'makanan' ? 'text-orange-600' : 'text-blue-600' }}"></i>
                         </div>
-                    </td>
-                    <td class="text-center py-3">{{ $detail->quantity }}</td>
-                    <td class="text-right py-3">Rp{{ number_format($detail->price) }}</td>
-                    <td class="text-right py-3 font-semibold">Rp{{ number_format($detail->subtotal) }}</td>
-                </tr>
+                        <div>
+                            <p class="font-medium text-coffee-900 text-sm">{{ $detail->menu->name }}</p>
+                            <p class="text-xs text-coffee-400">
+                                {{ $detail->quantity }} × Rp {{ number_format($detail->price, 0, ',', '.') }}
+                            </p>
+                        </div>
+                    </div>
+                    <span class="font-semibold text-coffee-700">
+                        Rp {{ number_format($detail->subtotal, 0, ',', '.') }}
+                    </span>
+                </div>
                 @endforeach
-            </tbody>
-        </table>
+            </div>
+        </div>
 
         <!-- Total & Pembayaran -->
-        <div class="border-t-2 border-dashed border-amber-300 pt-4">
-            <div class="flex justify-between items-center mb-2">
-                <span class="text-gray-600">Total</span>
-                <span class="text-xl font-bold text-amber-900">Rp{{ number_format($transaction->total_amount) }}</span>
+        <div class="border-t-2 border-dashed border-coffee-200 pt-4 space-y-2">
+            <div class="flex justify-between text-sm">
+                <span class="text-coffee-500">Subtotal</span>
+                <span>Rp {{ number_format($transaction->subtotal, 0, ',', '.') }}</span>
             </div>
-            <div class="flex justify-between items-center mb-2">
-                <span class="text-gray-600">Pembayaran</span>
-                <span class="font-semibold">Rp{{ number_format($transaction->payment_amount) }}</span>
+            <div class="flex justify-between text-sm">
+                <span class="text-coffee-500">PPN (11%)</span>
+                <span>Rp {{ number_format($transaction->tax_amount, 0, ',', '.') }}</span>
             </div>
-            <div class="flex justify-between items-center text-lg">
-                <span class="text-gray-600">Kembalian</span>
-                <span class="font-bold text-green-600">Rp{{ number_format($transaction->change_amount) }}</span>
+            <div class="flex justify-between items-center pt-2 border-t border-coffee-100">
+                <span class="text-coffee-700 font-semibold">Total</span>
+                <span class="text-xl font-bold text-coffee-900">
+                    Rp {{ number_format($transaction->total_amount, 0, ',', '.') }}
+                </span>
             </div>
+            
+            @if($transaction->payment_method == 'tunai')
+                <div class="flex justify-between text-sm">
+                    <span class="text-coffee-500">Pembayaran</span>
+                    <span>Rp {{ number_format($transaction->payment_amount, 0, ',', '.') }}</span>
+                </div>
+                <div class="flex justify-between items-center pt-2 border-t border-coffee-100">
+                    <span class="text-coffee-700 font-semibold">Kembalian</span>
+                    <span class="text-xl font-bold text-emerald-700">
+                        Rp {{ number_format($transaction->change_amount, 0, ',', '.') }}
+                    </span>
+                </div>
+            @endif
         </div>
 
-        <!-- Footer Struk -->
-        <div class="text-center mt-8 pt-6 border-t-2 border-dashed border-amber-300">
-            <p class="text-gray-500 text-sm">Terima kasih telah berkunjung!</p>
-            <p class="text-gray-500 text-sm">Simpan struk ini sebagai bukti pembayaran</p>
-            <p class="text-amber-700 font-semibold mt-2">😊 Selamat menikmati! 😊</p>
+        <!-- Footer -->
+        <div class="text-center mt-8 pt-6 border-t-2 border-dashed border-coffee-200">
+            <p class="text-coffee-400 text-sm">Terima kasih telah berkunjung!</p>
+            <p class="text-coffee-300 text-xs mt-1">Simpan struk ini sebagai bukti pembayaran</p>
+            <p class="text-coffee-500 font-medium mt-3">Selamat menikmati ☕</p>
         </div>
+    </div>
 
-        <!-- Tombol Aksi -->
-        <div class="mt-6 flex space-x-3">
-            <button onclick="window.print()" class="flex-1 bg-amber-600 text-white py-2 rounded-xl hover:bg-amber-700 transition">
-                🖨️ Cetak Struk
-            </button>
-            <a href="{{ route('kasir.dashboard') }}" class="flex-1 bg-green-600 text-white py-2 rounded-xl hover:bg-green-700 transition text-center">
-                ➕ Transaksi Baru
-            </a>
-        </div>
+    <!-- Action Buttons -->
+    <div class="flex gap-3 mt-6 no-print">
+        <button onclick="printStruk()" 
+                class="flex-1 btn-coffee flex items-center justify-center gap-2 py-3">
+            <i class="ph ph-printer text-lg"></i>
+            Cetak Struk
+        </button>
+        <a href="{{ route('kasir.dashboard') }}" 
+           class="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-emerald-600 text-white rounded-xl font-medium hover:bg-emerald-700 transition shadow-lg">
+            <i class="ph ph-plus-circle text-lg"></i>
+            Transaksi Baru
+        </a>
     </div>
 </div>
 
 <style>
     @media print {
-        body * {
-            visibility: hidden;
-        }
-        .cafe-card, .cafe-card * {
-            visibility: visible;
-        }
-        .cafe-card {
+        body * { visibility: hidden; }
+        #printArea, #printArea * { visibility: visible; }
+        #printArea {
             position: absolute;
-            left: 0;
-            top: 0;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
             width: 100%;
+            max-width: 400px;
             box-shadow: none !important;
+            border: none !important;
         }
-        button, a {
-            display: none !important;
-        }
+        .no-print { display: none !important; }
     }
 </style>
+@endsection
+
+@section('scripts')
+<script>
+function printStruk() {
+    window.print();
+}
+</script>
 @endsection

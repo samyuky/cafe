@@ -2,11 +2,12 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Menu;              // 👈 Tambahkan ini
-use App\Models\Transaction;      // 👈 Tambahkan ini
-use App\Models\TransactionDetail; // 👈 Tambahkan ini
-use App\Models\ActivityLog;      // 👈 Tambahkan ini
+use App\Models\Menu;
+use App\Models\Transaction;
+use App\Models\TransactionDetail;
+use App\Models\ActivityLog;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class KasirController extends Controller
 {
@@ -19,55 +20,102 @@ class KasirController extends Controller
     public function storeTransaction(Request $request)
     {
         $request->validate([
-            'table_number' => 'required|integer|min:1',
+            'customer_name' => 'required|string|max:255',
             'items' => 'required|array|min:1',
             'items.*.menu_id' => 'required|exists:menus,id',
-            'items.*.quantity' => 'required|integer|min:1',
-            'payment_amount' => 'required|numeric|min:0',
+            'items.*.quantity' => 'required|integer|min:1|max:99',
+            'payment_method' => 'required|in:tunai,qris',
+            'payment_amount' => 'nullable|numeric|min:0',
+        ], [
+            'customer_name.required' => 'Nama pembeli harus diisi',
+            'items.required' => 'Pilih minimal 1 menu',
+            'payment_method.required' => 'Pilih metode pembayaran',
         ]);
         
-        // Hitung total
-        $total = 0;
+        // Hitung subtotal
+        $subtotal = 0;
         $details = [];
         
         foreach($request->items as $item) {
-            $menu = Menu::find($item['menu_id']);
-            $subtotal = $menu->price * $item['quantity'];
-            $total += $subtotal;
+            $menu = Menu::findOrFail($item['menu_id']);
+            
+            if (!$menu->is_available) {
+                return back()->with('error', 'Menu ' . $menu->name . ' tidak tersedia!');
+            }
+            
+            $itemSubtotal = $menu->price * $item['quantity'];
+            $subtotal += $itemSubtotal;
             
             $details[] = new TransactionDetail([
                 'menu_id' => $menu->id,
                 'quantity' => $item['quantity'],
                 'price' => $menu->price,
-                'subtotal' => $subtotal,
+                'subtotal' => $itemSubtotal,
             ]);
         }
         
-        // Validasi pembayaran
-        if($request->payment_amount < $total) {
-            return back()->with('error', 'Pembayaran kurang! Total: Rp' . number_format($total));
+        // Hitung pajak (PPN 11%)
+        $taxRate = 0.11;
+        $taxAmount = $subtotal * $taxRate;
+        $totalAmount = $subtotal + $taxAmount;
+        
+        // Tentukan pembayaran berdasarkan metode
+        if ($request->payment_method == 'qris') {
+            // QRIS: pembayaran pas dengan total
+            $paymentAmount = $totalAmount;
+            $changeAmount = 0;
+        } else {
+            // Tunai: validasi pembayaran
+            $paymentAmount = $request->payment_amount ?? 0;
+            
+            if ($paymentAmount < $totalAmount) {
+                return back()->with('error', 
+                    'Pembayaran kurang! Total: Rp ' . number_format($totalAmount, 0, ',', '.') . 
+                    ' | Dibayar: Rp ' . number_format($paymentAmount, 0, ',', '.')
+                );
+            }
+            
+            $changeAmount = $paymentAmount - $totalAmount;
         }
         
-        // Simpan transaksi
-        $transaction = Transaction::create([
-            'user_id' => auth()->id(),
-            'table_number' => $request->table_number,
-            'total_amount' => $total,
-            'payment_amount' => $request->payment_amount,
-            'change_amount' => $request->payment_amount - $total,
-            'transaction_date' => now(),
-        ]);
+        // Generate nomor antrian
+        $queueNumber = Transaction::generateQueueNumber();
         
-        $transaction->transactionDetails()->saveMany($details);
-        
-        // Log activity
-        ActivityLog::create([
-            'user_id' => auth()->id(),
-            'activity' => 'Transaksi',
-            'description' => 'Transaksi meja ' . $request->table_number . ' sebesar Rp' . number_format($total)
-        ]);
-        
-        return redirect()->route('kasir.struk', $transaction->id);
+        try {
+            DB::beginTransaction();
+            
+            $transaction = Transaction::create([
+                'user_id' => auth()->id(),
+                'customer_name' => $request->customer_name,
+                'queue_number' => $queueNumber,
+                'subtotal' => $subtotal,
+                'tax_amount' => $taxAmount,
+                'total_amount' => $totalAmount,
+                'payment_amount' => $paymentAmount,
+                'change_amount' => $changeAmount,
+                'payment_method' => $request->payment_method,
+                'transaction_date' => now(),
+            ]);
+            
+            $transaction->transactionDetails()->saveMany($details);
+            
+            // Log activity
+            ActivityLog::create([
+                'user_id' => auth()->id(),
+                'activity' => 'Transaksi Baru',
+                'description' => $queueNumber . ' | ' . $request->customer_name . 
+                            ' | ' . strtoupper($request->payment_method) . 
+                            ' | Total: Rp ' . number_format($totalAmount, 0, ',', '.')
+            ]);
+            
+            DB::commit();
+            
+            return redirect()->route('kasir.struk', $transaction->id);
+            
+        } catch (\Exception $e) {
+            DB::rollback();
+            return back()->with('error', 'Gagal memproses transaksi! Silakan coba lagi.');
+        }
     }
     
     public function transactions()

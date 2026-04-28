@@ -11,13 +11,14 @@ class CheckRole
     public function handle(Request $request, Closure $next, $role)
     {
         if (!Auth::check()) {
-            return redirect('login');
+            return redirect()->route('login');
         }
 
         $user = Auth::user();
         
         if ($user->role !== $role) {
-            abort(403, 'Unauthorized action.');
+            // Redirect ke dashboard sesuai role
+            return redirect()->route($user->role . '.dashboard');
         }
 
         return $next($request);
