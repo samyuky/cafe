@@ -192,9 +192,18 @@
         
         @yield('content')
     </main>
+    <!-- QR Code Library (sebelum yield) -->
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
+        <!-- QR Code Library -->
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
     
+    <!-- Barcode Library -->
+    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+    
+    <!-- Page Scripts -->
     @yield('scripts')
     
+    <!-- Logout Confirmation -->
     <script>
         function confirmLogout() {
             if (confirm('Apakah Anda yakin ingin keluar?')) {

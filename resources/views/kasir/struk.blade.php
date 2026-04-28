@@ -21,6 +21,11 @@
                 </span>
             </div>
             
+            <!-- Barcode -->
+            <div class="mt-4 flex justify-center">
+                <svg id="barcode"></svg>
+            </div>
+            
             <div class="mt-3 inline-flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-700 rounded-full">
                 <i class="ph ph-check-circle text-emerald-600"></i>
                 <span class="text-sm font-semibold">LUNAS</span>
@@ -170,6 +175,31 @@
 
 @section('scripts')
 <script>
+// Generate Barcode
+document.addEventListener('DOMContentLoaded', function() {
+    const transactionId = "{{ $transaction->queue_number }}";
+    
+    try {
+        JsBarcode("#barcode", transactionId, {
+            format: "CODE128",
+            width: 2,
+            height: 60,
+            displayValue: true,
+            fontSize: 14,
+            font: "Inter",
+            textMargin: 5,
+            margin: 10,
+            background: "#ffffff",
+            lineColor: "#000000",
+            text: transactionId
+        });
+    } catch (error) {
+        console.error('Barcode error:', error);
+        document.getElementById('barcode').innerHTML = 
+            '<text x="50%" y="50%" text-anchor="middle" fill="#999">' + transactionId + '</text>';
+    }
+});
+
 function printStruk() {
     window.print();
 }

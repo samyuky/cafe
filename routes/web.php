@@ -80,3 +80,36 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
     Route::put('/user/{id}/role', [AdminController::class, 'updateUserRole'])->name('user.role');
     Route::get('/activity-log', [AdminController::class, 'activityLog'])->name('activity-log');
 });
+
+// QRIS Route - Generate data pembayaran
+Route::post('/qris/generate', function (\Illuminate\Http\Request $request) {
+    $total = $request->total ?? 0;
+    $customerName = $request->customer_name ?? 'Customer';
+    $timestamp = now()->timestamp;
+    
+    // Data QRIS (bisa diganti dengan format NMID/QRIS asli dari bank)
+    $merchantId = '9360000100123456'; // ID Merchant simulasi
+    $transactionId = $timestamp;
+    
+    // Format QRIS standar (00-01-02-...)
+    $qrisString = '000201';
+    $qrisString .= '010211';
+    $qrisString .= '26' . str_pad(strlen('01' . $merchantId), 2, '0', STR_PAD_LEFT) . '01' . $merchantId;
+    $qrisString .= '52045999'; // Kategori
+    $qrisString .= '5303360'; // Mata uang IDR
+    $qrisString .= '54' . str_pad(strlen($total), 2, '0', STR_PAD_LEFT) . $total;
+    $qrisString .= '5802ID'; // Negara
+    $qrisString .= '59' . str_pad(strlen('CUMA Cafe'), 2, '0', STR_PAD_LEFT) . 'CUMA Cafe';
+    $qrisString .= '60' . str_pad(strlen('Jakarta'), 2, '0', STR_PAD_LEFT) . 'Jakarta';
+    $qrisString .= '61' . str_pad(strlen($transactionId), 2, '0', STR_PAD_LEFT) . $transactionId;
+    $qrisString .= '62' . str_pad(strlen($customerName), 2, '0', STR_PAD_LEFT) . $customerName;
+    
+    return response()->json([
+        'success' => true,
+        'qris_data' => $qrisString,
+        'total' => $total,
+        'transaction_id' => $transactionId,
+        'customer_name' => $customerName,
+        'merchant_name' => 'CUMA Cafe',
+    ]);
+})->name('qris.generate');

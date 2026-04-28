@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\User;          // 👈 Tambahkan ini
-use App\Models\ActivityLog;   // 👈 Tambahkan ini
+use App\Models\User;
+use App\Models\ActivityLog;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 
@@ -11,7 +11,11 @@ class AdminController extends Controller
 {
     public function dashboard()
     {
-        $users = User::all();
+        // Hanya tampilkan user selain admin (kasir & manager)
+        $users = User::where('role', '!=', 'admin')
+            ->orderBy('created_at', 'desc')
+            ->get();
+            
         return view('admin.dashboard', compact('users'));
     }
     
@@ -21,7 +25,9 @@ class AdminController extends Controller
             'full_name' => 'required|string|max:255',
             'email' => 'required|email|unique:users',
             'password' => 'required|min:8',
-            'role' => 'required|in:admin,manager,kasir',
+            'role' => 'required|in:kasir,manager', // Admin tidak bisa dibuat dari sini
+        ], [
+            'role.in' => 'Role tidak valid',
         ]);
         
         User::create([
@@ -35,24 +41,30 @@ class AdminController extends Controller
         ActivityLog::create([
             'user_id' => auth()->id(),
             'activity' => 'Tambah User',
-            'description' => 'Menambahkan user: ' . $request->full_name
+            'description' => 'Menambahkan user: ' . $request->full_name . ' sebagai ' . ucfirst($request->role)
         ]);
         
-        return redirect()->route('admin.dashboard')->with('success', 'User berhasil ditambahkan');
+        return redirect()->route('admin.dashboard')->with('success', 'User berhasil ditambahkan!');
     }
     
     public function updateUserRole(Request $request, $id)
     {
         $user = User::findOrFail($id);
+        
+        // Cegah mengubah role admin lain
+        if ($user->role == 'admin' && $user->id != auth()->id()) {
+            return redirect()->route('admin.dashboard')->with('error', 'Tidak dapat mengubah role admin lain!');
+        }
+        
         $user->update(['role' => $request->role]);
         
         ActivityLog::create([
             'user_id' => auth()->id(),
             'activity' => 'Update Role',
-            'description' => 'Update role user: ' . $user->full_name . ' menjadi ' . $request->role
+            'description' => 'Update role user: ' . $user->full_name . ' menjadi ' . ucfirst($request->role)
         ]);
         
-        return redirect()->route('admin.dashboard')->with('success', 'Role user berhasil diupdate');
+        return redirect()->route('admin.dashboard')->with('success', 'Role user berhasil diupdate!');
     }
     
     public function activityLog()

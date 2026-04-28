@@ -85,10 +85,12 @@
                     
                     <!-- Nama Pembeli -->
                     <div class="mb-3">
-                        <label class="block text-sm font-medium text-coffee-700 mb-2">Nama Pembeli</label>
+                        <label class="block text-sm font-medium text-coffee-700 mb-2">
+                            Nama Pembeli <span class="text-red-500">*</span>
+                        </label>
                         <div class="relative">
                             <i class="ph ph-user absolute left-3 top-1/2 -translate-y-1/2 text-coffee-400"></i>
-                            <input type="text" name="customer_name" required 
+                            <input type="text" name="customer_name" id="customerName" required 
                                    class="input-coffee pl-10" placeholder="Masukkan nama pembeli">
                         </div>
                     </div>
@@ -99,7 +101,7 @@
                         <div class="grid grid-cols-2 gap-3">
                             <label class="relative cursor-pointer">
                                 <input type="radio" name="payment_method" value="tunai" checked 
-                                    class="peer absolute opacity-0" onchange="updatePaymentMethod()">
+                                    class="peer absolute opacity-0" onchange="switchPaymentMethod()">
                                 <div class="border-2 border-coffee-200 rounded-xl p-3 text-center peer-checked:border-coffee-600 peer-checked:bg-coffee-50 transition hover:border-coffee-400">
                                     <i class="ph ph-money text-2xl text-coffee-600 block mb-1"></i>
                                     <span class="text-sm font-medium text-coffee-700">Tunai</span>
@@ -108,7 +110,7 @@
                             
                             <label class="relative cursor-pointer">
                                 <input type="radio" name="payment_method" value="qris" 
-                                    class="peer absolute opacity-0" onchange="updatePaymentMethod()">
+                                    class="peer absolute opacity-0" onchange="switchPaymentMethod()">
                                 <div class="border-2 border-coffee-200 rounded-xl p-3 text-center peer-checked:border-coffee-600 peer-checked:bg-coffee-50 transition hover:border-coffee-400">
                                     <i class="ph ph-qr-code text-2xl text-coffee-600 block mb-1"></i>
                                     <span class="text-sm font-medium text-coffee-700">QRIS</span>
@@ -140,13 +142,23 @@
                             <span id="totalAmount" class="text-xl font-bold text-coffee-900">Rp 0</span>
                         </div>
                         
+                        <!-- Input Tunai -->
                         <div id="paymentInputContainer">
-                            <label class="block text-sm font-medium text-coffee-700 mb-2 mt-3">Pembayaran</label>
+                            <label class="block text-sm font-medium text-coffee-700 mb-2 mt-3">
+                                Pembayaran Tunai <span class="text-red-500">*</span>
+                            </label>
                             <div class="relative">
                                 <i class="ph ph-money absolute left-3 top-1/2 -translate-y-1/2 text-coffee-400"></i>
                                 <input type="number" name="payment_amount" id="paymentAmount" 
                                        class="input-coffee pl-10" placeholder="Jumlah uang">
                             </div>
+                            <p id="paymentHint" class="text-xs text-coffee-400 mt-1">Masukkan jumlah uang dari pembeli</p>
+                        </div>
+                        
+                        <!-- Info QRIS -->
+                        <div id="qrisInfo" class="hidden bg-blue-50 rounded-xl p-4 text-center mt-3">
+                            <p class="text-sm font-medium text-blue-700">Pembayaran QRIS</p>
+                            <p class="text-xs text-blue-600">Scan QR code untuk membayar</p>
                         </div>
                         
                         <div class="flex justify-between items-center bg-coffee-50 p-3 rounded-xl">
@@ -154,10 +166,10 @@
                             <span id="changeAmount" class="text-lg font-bold text-emerald-700">Rp 0</span>
                         </div>
                         
-                        <button type="submit" 
-                                class="btn-coffee w-full py-3 flex items-center justify-center gap-2 text-base">
+                        <button type="submit" id="submitButton"
+                                class="btn-coffee w-full py-3 flex items-center justify-center gap-2 text-base disabled:opacity-50 disabled:cursor-not-allowed">
                             <i class="ph ph-check-circle text-lg"></i>
-                            Proses Pembayaran
+                            <span id="submitText">Proses Pembayaran</span>
                         </button>
                     </div>
                 </form>
@@ -165,13 +177,61 @@
         </div>
     </div>
 </div>
+
+<!-- QRIS Modal (DI LUAR FORM) -->
+<div id="qrisModal" class="fixed inset-0 bg-black/60 hidden items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-2xl p-8 max-w-md w-full text-center shadow-2xl relative">
+        <button onclick="cancelQRIS()" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600">
+            <i class="ph ph-x text-2xl"></i>
+        </button>
+        
+        <h3 class="text-xl font-bold text-coffee-900 mb-2">Pembayaran QRIS</h3>
+        <p class="text-sm text-coffee-500 mb-4">Scan QR code untuk membayar</p>
+        
+        <div class="bg-white border-2 border-coffee-200 rounded-2xl p-4 mb-4 inline-block">
+            <div id="qrisLoading" class="w-64 h-64 flex items-center justify-center">
+                <div class="animate-spin rounded-full h-12 w-12 border-4 border-coffee-200 border-t-coffee-600"></div>
+            </div>
+            <canvas id="qrisCanvas" class="hidden" width="256" height="256"></canvas>
+        </div>
+        
+        <div class="bg-coffee-50 rounded-xl p-4 mb-4">
+            <p class="text-sm text-coffee-500">Total Pembayaran</p>
+            <p id="qrisTotal" class="text-2xl font-bold text-coffee-900">Rp 0</p>
+        </div>
+        
+        <div id="qrisStatus" class="mb-4">
+            <p class="text-sm text-blue-600 flex items-center justify-center gap-2">
+                <span class="animate-spin rounded-full h-4 w-4 border-2 border-blue-600 border-t-transparent"></span>
+                Menunggu pembayaran...
+            </p>
+        </div>
+        
+        <p class="text-xs text-coffee-400 mb-4" id="qrisTimer">QR Code akan kadaluarsa dalam 5:00</p>
+        
+        <div class="flex gap-3">
+            <button onclick="cancelQRIS()" 
+                    class="flex-1 px-4 py-3 border border-coffee-200 text-coffee-700 rounded-xl hover:bg-coffee-50 transition font-medium">
+                Batalkan
+            </button>
+            <button onclick="manualQRISPayment()" 
+                    class="flex-1 px-4 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition font-medium">
+                Konfirmasi Manual
+            </button>
+        </div>
+    </div>
+</div>
 @endsection
 
 @section('scripts')
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
 <script>
 const TAX_RATE = 0.11;
 let orderItems = [];
 let subtotalAmount = 0;
+let qrisTimerInterval;
+let qrisSecondsLeft = 300;
+let qrisPaid = false;
 
 // Search
 document.getElementById('searchMenu').addEventListener('input', function() {
@@ -182,13 +242,25 @@ document.getElementById('searchMenu').addEventListener('input', function() {
 });
 
 // Filter
+document.querySelectorAll('.filter-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+        const category = this.textContent.includes('Makanan') ? 'makanan' : 
+                        this.textContent.includes('Minuman') ? 'minuman' : 'all';
+        filterCategory(category);
+    });
+});
+
 function filterCategory(category) {
     document.querySelectorAll('.filter-btn').forEach(btn => {
         btn.classList.remove('bg-coffee-800', 'text-white');
         btn.classList.add('bg-coffee-50', 'text-coffee-700');
     });
-    event.target.classList.add('bg-coffee-800', 'text-white');
-    event.target.classList.remove('bg-coffee-50', 'text-coffee-700');
+    
+    const activeBtn = category === 'all' ? document.querySelector('.filter-btn') :
+                     category === 'makanan' ? document.querySelectorAll('.filter-btn')[1] :
+                     document.querySelectorAll('.filter-btn')[2];
+    activeBtn.classList.add('bg-coffee-800', 'text-white');
+    activeBtn.classList.remove('bg-coffee-50', 'text-coffee-700');
     
     document.querySelectorAll('.menu-item').forEach(item => {
         item.style.display = (category === 'all' || item.dataset.category === category) ? '' : 'none';
@@ -201,44 +273,29 @@ function switchPaymentMethod() {
     const paymentInput = document.getElementById('paymentInputContainer');
     const paymentAmount = document.getElementById('paymentAmount');
     const qrisInfo = document.getElementById('qrisInfo');
-    const paymentHint = document.getElementById('paymentHint');
     const submitText = document.getElementById('submitText');
     const submitButton = document.getElementById('submitButton');
     const changeEl = document.getElementById('changeAmount');
     
     if (method === 'qris') {
-        // Sembunyikan input pembayaran
         paymentInput.style.display = 'none';
         paymentAmount.required = false;
         paymentAmount.value = '';
-        
-        // Tampilkan info QRIS
         qrisInfo.classList.remove('hidden');
-        
-        // Update teks tombol
         submitText.textContent = 'Bayar dengan QRIS';
-        submitButton.disabled = false;
-        
-        // Update kembalian
+        submitButton.disabled = orderItems.length === 0;
         changeEl.textContent = 'Rp 0 (QRIS)';
         changeEl.className = 'text-sm font-medium text-blue-600';
     } else {
-        // Tampilkan input pembayaran
         paymentInput.style.display = 'block';
         paymentAmount.required = true;
-        
-        // Sembunyikan info QRIS
         qrisInfo.classList.add('hidden');
-        
-        // Update teks
-        paymentHint.textContent = 'Masukkan jumlah uang dari pembeli';
         submitText.textContent = 'Proses Pembayaran';
-        
         calculateChange();
     }
 }
 
-// Add item to cart
+// Add to cart
 document.querySelectorAll('.menu-item').forEach(item => {
     item.addEventListener('click', function() {
         const id = this.dataset.id;
@@ -246,15 +303,10 @@ document.querySelectorAll('.menu-item').forEach(item => {
         const price = parseFloat(this.dataset.price);
         
         const existing = orderItems.find(i => i.id === id);
-        if (existing) {
-            existing.quantity++;
-        } else {
-            orderItems.push({ id, name, price, quantity: 1 });
-        }
+        if (existing) existing.quantity++;
+        else orderItems.push({ id, name, price, quantity: 1 });
         
         updateOrderDisplay();
-        
-        // Animation
         this.style.transform = 'scale(0.95)';
         setTimeout(() => this.style.transform = '', 100);
     });
@@ -276,40 +328,30 @@ function updateOrderDisplay() {
             const itemSubtotal = item.price * item.quantity;
             subtotalAmount += itemSubtotal;
             return `
-                <div class="bg-coffee-50 rounded-xl p-3 animate-fade-in">
+                <div class="bg-coffee-50 rounded-xl p-3">
                     <div class="flex justify-between items-start mb-2">
-                        <div class="flex-1 mr-2">
-                            <p class="font-medium text-coffee-900 text-sm">${item.name}</p>
-                            <p class="text-xs text-coffee-400">Rp ${item.price.toLocaleString()} × ${item.quantity}</p>
-                        </div>
+                        <div><p class="font-medium text-coffee-900 text-sm">${item.name}</p>
+                        <p class="text-xs text-coffee-400">Rp ${item.price.toLocaleString()} × ${item.quantity}</p></div>
                         <span class="font-semibold text-coffee-700 text-sm">Rp ${itemSubtotal.toLocaleString()}</span>
                     </div>
                     <div class="flex items-center gap-2">
-                        <button type="button" onclick="changeQty(${index}, -1)" 
-                                class="w-7 h-7 bg-white rounded-lg border border-coffee-200 hover:border-coffee-400 flex items-center justify-center text-sm">−</button>
-                        <span class="font-medium text-sm w-8 text-center">${item.quantity}</span>
-                        <button type="button" onclick="changeQty(${index}, 1)" 
-                                class="w-7 h-7 bg-white rounded-lg border border-coffee-200 hover:border-coffee-400 flex items-center justify-center text-sm">+</button>
-                        <button type="button" onclick="removeItem(${index})" class="ml-auto text-red-400 hover:text-red-600">
-                            <i class="ph ph-trash"></i>
-                        </button>
+                        <button type="button" onclick="changeQty(${index},-1)" class="w-7 h-7 bg-white rounded-lg border hover:border-coffee-400">−</button>
+                        <span class="w-8 text-center text-sm">${item.quantity}</span>
+                        <button type="button" onclick="changeQty(${index},1)" class="w-7 h-7 bg-white rounded-lg border hover:border-coffee-400">+</button>
+                        <button type="button" onclick="removeItem(${index})" class="ml-auto text-red-400"><i class="ph ph-trash"></i></button>
                     </div>
                     <input type="hidden" name="items[${index}][menu_id]" value="${item.id}">
                     <input type="hidden" name="items[${index}][quantity]" value="${item.quantity}">
                 </div>`;
         }).join('');
-        
         document.getElementById('submitButton').disabled = false;
     }
     
-    // Update amounts
     const taxAmount = subtotalAmount * TAX_RATE;
     const totalAmount = subtotalAmount + taxAmount;
-    
     document.getElementById('subtotalAmount').textContent = 'Rp ' + subtotalAmount.toLocaleString();
     document.getElementById('taxAmount').textContent = 'Rp ' + Math.round(taxAmount).toLocaleString();
     document.getElementById('totalAmount').textContent = 'Rp ' + Math.round(totalAmount).toLocaleString();
-    
     calculateChange();
 }
 
@@ -329,72 +371,172 @@ document.getElementById('paymentAmount').addEventListener('input', calculateChan
 function calculateChange() {
     const taxAmount = subtotalAmount * TAX_RATE;
     const totalAmount = subtotalAmount + taxAmount;
-    const method = document.querySelector('input[name="payment_method"]:checked').value;
+    const method = document.querySelector('input[name="payment_method"]:checked')?.value || 'tunai';
     const submitButton = document.getElementById('submitButton');
     const paymentHint = document.getElementById('paymentHint');
+    const el = document.getElementById('changeAmount');
     
     if (method === 'qris') {
-        document.getElementById('changeAmount').textContent = 'Rp 0 (QRIS)';
-        document.getElementById('changeAmount').className = 'text-sm font-medium text-blue-600';
-        submitButton.disabled = false;
+        el.textContent = 'Rp 0 (QRIS)';
+        el.className = 'text-sm font-medium text-blue-600';
+        submitButton.disabled = orderItems.length === 0;
         return;
     }
     
     const payment = parseFloat(document.getElementById('paymentAmount').value) || 0;
     const change = payment - totalAmount;
-    const el = document.getElementById('changeAmount');
     
     if (payment === 0) {
         el.textContent = 'Rp 0';
         el.className = 'text-lg font-bold text-coffee-400';
         submitButton.disabled = true;
-        paymentHint.textContent = 'Masukkan jumlah uang dari pembeli';
-        paymentHint.className = 'text-xs text-coffee-400 mt-1';
+        if (paymentHint) paymentHint.textContent = 'Masukkan jumlah uang dari pembeli';
     } else if (change >= 0) {
         el.textContent = 'Rp ' + Math.round(change).toLocaleString();
         el.className = 'text-lg font-bold text-emerald-700';
         submitButton.disabled = false;
-        paymentHint.textContent = '✅ Pembayaran cukup';
-        paymentHint.className = 'text-xs text-emerald-600 mt-1';
+        if (paymentHint) paymentHint.textContent = '✅ Pembayaran cukup';
     } else {
         el.textContent = 'Kurang Rp ' + Math.abs(Math.round(change)).toLocaleString();
         el.className = 'text-lg font-bold text-red-600';
         submitButton.disabled = true;
-        paymentHint.textContent = '❌ Pembayaran kurang Rp ' + Math.abs(Math.round(change)).toLocaleString();
-        paymentHint.className = 'text-xs text-red-500 mt-1';
+        if (paymentHint) paymentHint.textContent = '❌ Kurang Rp ' + Math.abs(Math.round(change)).toLocaleString();
     }
 }
 
-// Validasi sebelum submit
+// ===== QRIS FUNCTIONS =====
 document.getElementById('transactionForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
     const customerName = document.getElementById('customerName').value.trim();
     const method = document.querySelector('input[name="payment_method"]:checked').value;
     const taxAmount = subtotalAmount * TAX_RATE;
-    const totalAmount = subtotalAmount + taxAmount;
+    const totalAmount = Math.round(subtotalAmount + taxAmount);
     
-    if (!customerName) {
-        e.preventDefault();
-        alert('Nama pembeli harus diisi!');
+    if (!customerName) { alert('Nama pembeli harus diisi!'); return; }
+    if (orderItems.length === 0) { alert('Pilih minimal 1 menu!'); return; }
+    
+    if (method === 'qris') {
+        openQRISModal(totalAmount, customerName);
         return;
     }
     
-    if (orderItems.length === 0) {
-        e.preventDefault();
-        alert('Pilih minimal 1 menu!');
+    const payment = parseFloat(document.getElementById('paymentAmount').value) || 0;
+    if (payment < totalAmount) {
+        alert('Pembayaran kurang! Total: Rp ' + totalAmount.toLocaleString());
         return;
     }
     
-    if (method === 'tunai') {
-        const payment = parseFloat(document.getElementById('paymentAmount').value) || 0;
-        if (payment < totalAmount) {
-            e.preventDefault();
-            alert('Pembayaran kurang! Total: Rp ' + Math.round(totalAmount).toLocaleString());
-            return;
-        }
-    }
+    this.submit();
 });
 
-// Inisialisasi
+function openQRISModal(total, customerName) {
+    document.getElementById('qrisLoading').classList.remove('hidden');
+    document.getElementById('qrisCanvas').classList.add('hidden');
+    qrisPaid = false;
+    qrisSecondsLeft = 300;
+    document.getElementById('qrisTotal').textContent = 'Rp ' + total.toLocaleString();
+    document.getElementById('qrisStatus').innerHTML = '<p class="text-sm text-blue-600">⏳ Menunggu pembayaran...</p>';
+    
+    const modal = document.getElementById('qrisModal');
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+    document.body.style.overflow = 'hidden';
+    
+    generateQRCode(total, customerName);
+    startQRISTimer();
+}
+
+function generateQRCode(total, customerName) {
+    fetch('{{ route("qris.generate") }}', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+        body: JSON.stringify({ total: total, customer_name: customerName })
+    })
+    .then(r => r.json())
+    .then(data => {
+        document.getElementById('qrisLoading').classList.add('hidden');
+        const canvas = document.getElementById('qrisCanvas');
+        canvas.classList.remove('hidden');
+        
+        QRCode.toCanvas(canvas, data.qris_data || JSON.stringify(data), {
+            width: 256, margin: 2,
+            color: { dark: '#000000', light: '#ffffff' }
+        }, function(error) {
+            if (error) console.error('QR Error:', error);
+        });
+        
+        setTimeout(() => {
+            if (!qrisPaid && document.getElementById('qrisModal').classList.contains('flex')) {
+                processQRISPayment();
+            }
+        }, 5000);
+    });
+}
+
+function processQRISPayment() {
+    if (qrisPaid) return;
+    qrisPaid = true;
+    clearInterval(qrisTimerInterval);
+    
+    document.getElementById('qrisStatus').innerHTML = '<div class="bg-emerald-50 rounded-xl p-4"><i class="ph ph-check-circle text-emerald-600 text-4xl block mb-2"></i><p class="text-emerald-700 font-semibold">Pembayaran Berhasil!</p></div>';
+    document.getElementById('qrisTimer').textContent = '✅ Selesai';
+    
+    setTimeout(() => completeQRISPayment(), 1000);
+}
+
+function manualQRISPayment() {
+    if (confirm('Apakah pembeli sudah membayar?')) processQRISPayment();
+}
+
+function completeQRISPayment() {
+    const taxAmount = subtotalAmount * TAX_RATE;
+    const totalAmount = Math.round(subtotalAmount + taxAmount);
+    const form = document.getElementById('transactionForm');
+    
+    let input = form.querySelector('input[name="payment_amount_auto"]');
+    if (!input) {
+        input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = 'payment_amount';
+        form.appendChild(input);
+    }
+    input.value = totalAmount;
+    
+    closeQRISModal();
+    form.submit();
+}
+
+function cancelQRIS() {
+    clearInterval(qrisTimerInterval);
+    closeQRISModal();
+    document.querySelector('input[value="tunai"]').checked = true;
+    switchPaymentMethod();
+}
+
+function closeQRISModal() {
+    const modal = document.getElementById('qrisModal');
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+    document.body.style.overflow = '';
+}
+
+function startQRISTimer() {
+    clearInterval(qrisTimerInterval);
+    qrisTimerInterval = setInterval(() => {
+        qrisSecondsLeft--;
+        const m = Math.floor(qrisSecondsLeft / 60);
+        const s = qrisSecondsLeft % 60;
+        document.getElementById('qrisTimer').textContent = `QR Code akan kadaluarsa dalam ${m}:${s.toString().padStart(2, '0')}`;
+        
+        if (qrisSecondsLeft <= 0) {
+            clearInterval(qrisTimerInterval);
+            document.getElementById('qrisStatus').innerHTML = '<div class="bg-red-50 rounded-xl p-4"><p class="text-red-700 font-semibold">QR Code Kadaluarsa!</p></div>';
+        }
+    }, 1000);
+}
+
+// Init
 updateOrderDisplay();
 switchPaymentMethod();
 </script>
